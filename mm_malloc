@@ -1,0 +1,91 @@
+/* Allocate a block of size size and return a pointer to it. */
+void* mm_malloc (size_t size) {        //4 bytes alligned always return 9
+  size_t reqSize;
+  BlockInfo * ptrFreeBlock = NULL;    //block info
+    BlockInfo * secondBlock = NULL;    //block info
+    BlockInfo * returnBlock = NULL;
+  size_t blockSize;
+  size_t precedingBlockUseTag;
+   
+  // Zero-size requests get NULL.
+  if (size == 0) {
+    return NULL;
+  }
+   
+  // Add one word for the initial size header.
+  // Note that we don't need to boundary tag when the block is used!
+  size += WORD_SIZE;
+  if (size <= MIN_BLOCK_SIZE) {
+    // Make sure we allocate enough space for a blockInfo in case we
+    // free this block (when we free this block, we'll need to use the
+    // next pointer, the prev pointer, and the boundary tag).
+    reqSize = MIN_BLOCK_SIZE;
+  } else {
+    // Round up for correct alignment
+    reqSize = ALIGNMENT * ((size + ALIGNMENT - 1) / ALIGNMENT);
+  }
+   
+  // Implement mm_malloc You can change or remove any of the above
+  // code.  It is included as a suggestion of where to start.
+  // You will want to replace this return statement...
+
+  // Finding the block. You may use searchFreeList(), requestMoreSpace()
+  // examine_heap();
+
+    // Remove this block from freelist
+
+    //Search the free list for a block with the space needed
+    if (searchFreeList(reqSize) == NULL){     //if no block has enough sapce requets more
+        requestMoreSpace(reqSize);        //change block size
+    }
+   
+    ptrFreeBlock = searchFreeList(reqSize);
+    removeFreeBlock(ptrFreeBlock);     //delete block were using from free list
+       
+    blockSize = SIZE(ptrFreeBlock->sizeAndTags);
+    size_t actSize = blockSize - reqSize;
+    actSize = SIZE(actSize);
+  // Check the size of new block: split it when it is at least one minimum block larger
+    fprintf(stderr, "mm_malloc is called\n");
+
+  if(actSize >= MIN_BLOCK_SIZE) {  
+    // Split a large block to two piece
+    // Reset the size and used tag for the first block, but kept others intact
+        ptrFreeBlock->sizeAndTags = reqSize | TAG_USED;
+    // Set up for the 2nd block
+        secondBlock = (BlockInfo*)UNSCALED_POINTER_ADD(ptrFreeBlock, reqSize);
+    // Save the new size and tag info in the  block info of the next block.
+    // Tag it to show the preceding block is used
+    secondBlock->sizeAndTags = actSize | TAG_PRECEDING_USED;
+        // Setting the boundary tag for the 2nd block
+        secondBlock->sizeAndTags &= ~TAG_USED;
+        *(size_t*)UNSCALED_POINTER_SUB(secondBlock, WORD_SIZE) = actSize | TAG_PRECEDING_USED;
+    //*(size_t*)UNSCALED_POINTER_ADD(secondBlock, actSize - WORD_SIZE) = secondBlock->sizeAndTags;
+        //fprintf(stderr, "second block sizentag: %p\n", secondBlock->sizeAndTags);       
+        // Put the new block in the free list using both insertFreeBlock() and coalesceFreeBlock()
+        insertFreeBlock(secondBlock);           
+        coalesceFreeBlock(secondBlock);       
+        //fprintf(stderr, "second block's next value: %p\n", secondBlock->next);   
+        secondBlock->prev = ptrFreeBlock;
+        // Setting up the tag for the next block
+        if (ptrFreeBlock->next != "nil"){
+            ptrFreeBlock->next->sizeAndTags & TAG_PRECEDING_USED;}
+ 
+        if (secondBlock->next != "nil") {
+            secondBlock->next->sizeAndTags & ~TAG_PRECEDING_USED;}
+
+            examine_heap();
+  }
+  else {
+    // Now there is no need to split it
+    // Update block header to be used and correct size
+        //ptrFreeBlock->sizeAndTags = SIZE(size) | TAG_USED;
+        SIZE(ptrFreeBlock->sizeAndTags) | TAG_USED;
+  }
+    //fprintf(stderr, "second block: %p\n", secondBlock);
+    //fprintf(stderr, "second block's pervious value: %p\n", secondBlock->prev);
+  // Return location of correct pointer!   
+    ptrFreeBlock = SIZE(ptrFreeBlock->sizeAndTags);
+    fprintf(stderr, "ptr: %p\n", &ptrFreeBlock);   
+    return ptrFreeBlock;
+}
