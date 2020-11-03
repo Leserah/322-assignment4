@@ -97,7 +97,6 @@ void mm_free (void *ptr) {
     //fprintf(stderr, "mm_free is called\n");
   // Get block info and payload size
     blockInfo = UNSCALED_POINTER_SUB(ptr, WORD_SIZE);
-    if(!((blockInfo->sizeAndTags)&TAG_USED)) return;
     payloadSize = SIZE(blockInfo->sizeAndTags) - WORD_SIZE;
 
   // Update block header and footer
