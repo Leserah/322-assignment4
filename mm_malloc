@@ -43,49 +43,75 @@ void* mm_malloc (size_t size) {        //4 bytes alligned always return 9
     removeFreeBlock(ptrFreeBlock);     //delete block were using from free list
        
     blockSize = SIZE(ptrFreeBlock->sizeAndTags);
-    size_t actSize = blockSize - reqSize;
+    size_t actSize = blockSize - reqSize;        //block size for second block
     actSize = SIZE(actSize);
   // Check the size of new block: split it when it is at least one minimum block larger
-    fprintf(stderr, "mm_malloc is called\n");
-
+    //fprintf(stderr, "mm_malloc is called\n");
+   
   if(actSize >= MIN_BLOCK_SIZE) {  
     // Split a large block to two piece
     // Reset the size and used tag for the first block, but kept others intact
         ptrFreeBlock->sizeAndTags = reqSize | TAG_USED;
+        ptrFreeBlock->sizeAndTags |= TAG_PRECEDING_USED;
+
     // Set up for the 2nd block
-        secondBlock = (BlockInfo*)UNSCALED_POINTER_ADD(ptrFreeBlock, reqSize);
     // Save the new size and tag info in the  block info of the next block.
     // Tag it to show the preceding block is used
-    secondBlock->sizeAndTags = actSize | TAG_PRECEDING_USED;
         // Setting the boundary tag for the 2nd block
+        secondBlock = (BlockInfo*)UNSCALED_POINTER_ADD(ptrFreeBlock, reqSize);
+    secondBlock->sizeAndTags = actSize | TAG_PRECEDING_USED;
         secondBlock->sizeAndTags &= ~TAG_USED;
-        *(size_t*)UNSCALED_POINTER_SUB(secondBlock, WORD_SIZE) = actSize | TAG_PRECEDING_USED;
-    //*(size_t*)UNSCALED_POINTER_ADD(secondBlock, actSize - WORD_SIZE) = secondBlock->sizeAndTags;
-        //fprintf(stderr, "second block sizentag: %p\n", secondBlock->sizeAndTags);       
+    *(size_t*)UNSCALED_POINTER_ADD(secondBlock, actSize - WORD_SIZE) = secondBlock->sizeAndTags;
+
         // Put the new block in the free list using both insertFreeBlock() and coalesceFreeBlock()
         insertFreeBlock(secondBlock);           
         coalesceFreeBlock(secondBlock);       
-        //fprintf(stderr, "second block's next value: %p\n", secondBlock->next);   
-        secondBlock->prev = ptrFreeBlock;
-        // Setting up the tag for the next block
-        if (ptrFreeBlock->next != "nil"){
-            ptrFreeBlock->next->sizeAndTags & TAG_PRECEDING_USED;}
- 
-        if (secondBlock->next != "nil") {
-            secondBlock->next->sizeAndTags & ~TAG_PRECEDING_USED;}
 
-            examine_heap();
+        // Setting up the tag for the next block
+        returnBlock = (void *)UNSCALED_POINTER_ADD(ptrFreeBlock, WORD_SIZE);
+        returnBlock->sizeAndTags |= TAG_PRECEDING_USED;
   }
   else {
     // Now there is no need to split it
     // Update block header to be used and correct size
-        //ptrFreeBlock->sizeAndTags = SIZE(size) | TAG_USED;
-        SIZE(ptrFreeBlock->sizeAndTags) | TAG_USED;
+        ptrFreeBlock->sizeAndTags = reqSize | TAG_USED;
+        ptrFreeBlock->sizeAndTags |= TAG_PRECEDING_USED;
+        if (returnBlock == NULL){return NULL;}
   }
-    //fprintf(stderr, "second block: %p\n", secondBlock);
     //fprintf(stderr, "second block's pervious value: %p\n", secondBlock->prev);
   // Return location of correct pointer!   
-    ptrFreeBlock = SIZE(ptrFreeBlock->sizeAndTags);
-    fprintf(stderr, "ptr: %p\n", &ptrFreeBlock);   
-    return ptrFreeBlock;
+    //fprintf(stderr, "ptr: %p\n", ptrFreeBlock);   
+    //fprintf(stderr, "return block finished\n");
+    //examine_heap();
+    return returnBlock;
+}
+
+/* Free the block referenced by ptr. */
+void mm_free (void *ptr) {
+  size_t payloadSize;
+  BlockInfo * blockInfo;
+  BlockInfo * followingBlock;
+
+  // Implement mm_free.  You can change or remove the declaraions
+  // above.  They are included as minor hints.
+    //fprintf(stderr, "mm_free is called\n");
+  // Get block info and payload size
+    blockInfo = UNSCALED_POINTER_SUB(ptr, WORD_SIZE);
+    if(!((blockInfo->sizeAndTags)&TAG_USED)) return;
+    payloadSize = SIZE(blockInfo->sizeAndTags) - WORD_SIZE;
+
+  // Update block header and footer
+    blockInfo->sizeAndTags &= ~TAG_USED;
+    *(size_t*)UNSCALED_POINTER_ADD(blockInfo, payloadSize) = blockInfo->sizeAndTags;
+
+  // Get the next block and update its header (since its preceding block is now free)
+    followingBlock = UNSCALED_POINTER_ADD(ptr, payloadSize);
+    //fprintf(stderr, "follow block: %p\n", ptr);
+    followingBlock->sizeAndTags &= ~TAG_PRECEDING_USED;   
+    //fprintf(stderr, "next block header and its header\n");
+  // Insert free block into free list
+    insertFreeBlock(blockInfo);
+   
+  // Coalesce free block
+    coalesceFreeBlock(blockInfo);
 }
