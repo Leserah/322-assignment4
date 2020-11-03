@@ -36,7 +36,7 @@ void* mm_malloc (size_t size) {        //4 bytes alligned always return 9
     // Remove this block from freelist
     //Search the free list for a block with the space needed
     if (searchFreeList(reqSize) == NULL){     //if no block has enough sapce requets more
-        fprintf(stderr, "REQUEDST MORE SPACE\n");       
+        //fprintf(stderr, "REQUEDST MORE SPACE\n");       
         //fprintf(stderr, "reqsize %d\n", reqSize);
         requestMoreSpace(reqSize);        //change block size
     }
@@ -50,9 +50,9 @@ void* mm_malloc (size_t size) {        //4 bytes alligned always return 9
     precedingBlockUseTag = ptrFreeBlock->sizeAndTags & TAG_PRECEDING_USED;
  
     if(actSize >= MIN_BLOCK_SIZE) {
-        fprintf(stderr, "req: %d\n", (reqSize));
-        fprintf(stderr, "block: %d\n", (blockSize));
-        fprintf(stderr, "enter if statement\n");        // minus WORD_SIZE
+        //fprintf(stderr, "req: %d\n", (reqSize));
+        //fprintf(stderr, "block: %d\n", (blockSize));
+        //fprintf(stderr, "enter if statement\n");        // minus WORD_SIZE
     // Split a large block to two piece
     // Reset the size and used tag for the first block, but kept others intact
         ptrFreeBlock->sizeAndTags= reqSize | TAG_USED;
@@ -86,8 +86,8 @@ void* mm_malloc (size_t size) {        //4 bytes alligned always return 9
         //fprintf(stderr, "enters else case\n");        // minus WORD_SIZE
     // Now there is no need to split it
     // Update block header to be used and correct size
-    *((size_t*)UNSCALED_POINTER_ADD(ptrFreeBlock, SIZE(ptrFreeBlock->sizeAndTags))) |= ~TAG_PRECEDING_USED;
-        ptrFreeBlock->sizeAndTags = reqSize | TAG_USED;
+    *((size_t*)UNSCALED_POINTER_ADD(ptrFreeBlock, SIZE(ptrFreeBlock->sizeAndTags))) |= TAG_PRECEDING_USED;
+        ptrFreeBlock->sizeAndTags = SIZE(ptrFreeBlock->sizeAndTags) | TAG_USED;
         if (precedingBlockUseTag){ptrFreeBlock->sizeAndTags |= TAG_PRECEDING_USED;}
 
     }
@@ -98,7 +98,36 @@ void* mm_malloc (size_t size) {        //4 bytes alligned always return 9
     //else {ptrFreeBlock->sizeAndTags = blockSize | TAG_USED; }
 
     // Return location of correct pointer!   
-    examine_heap();
+    //examine_heap();
     //fprintf(stderr, "address of next %p\n", &ptrFreeBlock->next);        // minus WORD_SIZE
-    return &ptrFreeBlock->next;
+    if (ptrFreeBlock == NULL){return NULL;}else{return &ptrFreeBlock->next;}
+}
+
+/* Free the block referenced by ptr. */
+void mm_free (void *ptr) {
+  size_t payloadSize;
+  BlockInfo * blockInfo;
+  BlockInfo * followingBlock;
+
+  // Implement mm_free.  You can change or remove the declaraions
+  // above.  They are included as minor hints.
+    //fprintf(stderr, "mm_free is called\n");
+  // Get block info and payload size
+    blockInfo = UNSCALED_POINTER_SUB(ptr, WORD_SIZE);
+    payloadSize = SIZE(blockInfo->sizeAndTags) - WORD_SIZE;
+
+  // Update block header and footer
+    blockInfo->sizeAndTags &= ~TAG_USED;
+    *(size_t*)UNSCALED_POINTER_ADD(blockInfo, payloadSize) = blockInfo->sizeAndTags;
+
+  // Get the next block and update its header (since its preceding block is now free)
+    followingBlock = UNSCALED_POINTER_ADD(ptr, payloadSize);
+    //fprintf(stderr, "follow block: %p\n", ptr);
+    followingBlock->sizeAndTags &= ~TAG_PRECEDING_USED;   
+    //fprintf(stderr, "next block header and its header\n");
+  // Insert free block into free list
+    insertFreeBlock(blockInfo);
+   
+  // Coalesce free block
+    coalesceFreeBlock(blockInfo);
 }
