@@ -1,4 +1,3 @@
-/* Allocate a block of size size and return a pointer to it. */
 void* mm_malloc (size_t size) {        //4 bytes alligned always return 9
   size_t reqSize;
   BlockInfo * ptrFreeBlock = NULL;    //block info
@@ -6,12 +5,12 @@ void* mm_malloc (size_t size) {        //4 bytes alligned always return 9
     BlockInfo * returnBlock = NULL;
   size_t blockSize;
   size_t precedingBlockUseTag;
-   
+
   // Zero-size requests get NULL.
   if (size == 0) {
     return NULL;
   }
-   
+
   // Add one word for the initial size header.
   // Note that we don't need to boundary tag when the block is used!
   size += WORD_SIZE;
@@ -24,93 +23,75 @@ void* mm_malloc (size_t size) {        //4 bytes alligned always return 9
     // Round up for correct alignment
     reqSize = ALIGNMENT * ((size + ALIGNMENT - 1) / ALIGNMENT);
   }
-   
   // Implement mm_malloc You can change or remove any of the above
   // code.  It is included as a suggestion of where to start.
   // You will want to replace this return statement...
 
   // Finding the block. You may use searchFreeList(), requestMoreSpace()
   // examine_heap();
+    //fprintf(stderr, "reqsize %d\n", reqSize);
+    examine_heap();
 
     // Remove this block from freelist
-
     //Search the free list for a block with the space needed
-    if (searchFreeList(reqSize) == NULL){     //if no block has enough sapce requets more
+    if ((ptrFreeBlock = searchFreeList(reqSize)) == NULL){     //if no block has enough sapce requets more
+        fprintf(stderr, "enter if statement\n");       
+        fprintf(stderr, "reqsize %d\n", reqSize);
         requestMoreSpace(reqSize);        //change block size
+        ptrFreeBlock = searchFreeList(reqSize);
     }
-   
-    ptrFreeBlock = searchFreeList(reqSize);
-    removeFreeBlock(ptrFreeBlock);     //delete block were using from free list
-       
+
+    fprintf(stderr, "ptrfreeblock size n tag %d\n", ptrFreeBlock->sizeAndTags);
+    //removeFreeBlock(ptrFreeBlock);     //delete block were using from free list
     blockSize = SIZE(ptrFreeBlock->sizeAndTags);
+    fprintf(stderr, "reqsize %d\n", reqSize);
     size_t actSize = blockSize - reqSize;        //block size for second block
-    actSize = SIZE(actSize);
   // Check the size of new block: split it when it is at least one minimum block larger
-    //fprintf(stderr, "mm_malloc is called\n");
-   
+    fprintf(stderr, "mm_malloc is called\n");
+    //fprintf(stderr, "free block size n tag: %d\n", ptrFreeBlock->sizeAndTags);
+
   if(actSize >= MIN_BLOCK_SIZE) {  
+        precedingBlockUseTag = ptrFreeBlock->sizeAndTags & TAG_PRECEDING_USED;
     // Split a large block to two piece
     // Reset the size and used tag for the first block, but kept others intact
         ptrFreeBlock->sizeAndTags = reqSize | TAG_USED;
-        ptrFreeBlock->sizeAndTags |= TAG_PRECEDING_USED;
+        //fprintf(stderr, "enter if statement\n");        // minus WORD_SIZE
+        if (precedingBlockUseTag){ptrFreeBlock->sizeAndTags |= TAG_PRECEDING_USED;}
 
     // Set up for the 2nd block
     // Save the new size and tag info in the  block info of the next block.
     // Tag it to show the preceding block is used
         // Setting the boundary tag for the 2nd block
-        secondBlock = (BlockInfo*)UNSCALED_POINTER_ADD(ptrFreeBlock, reqSize);
+        secondBlock = UNSCALED_POINTER_ADD(ptrFreeBlock, reqSize);
+        fprintf(stderr, "secondblock value: %d\n", secondBlock->sizeAndTags);
     secondBlock->sizeAndTags = actSize | TAG_PRECEDING_USED;
         secondBlock->sizeAndTags &= ~TAG_USED;
-    *(size_t*)UNSCALED_POINTER_ADD(secondBlock, actSize - WORD_SIZE) = secondBlock->sizeAndTags;
-
+        //fprintf(stderr, "one\n");
+    *((size_t*)UNSCALED_POINTER_ADD(secondBlock, actSize - WORD_SIZE)) |= ~TAG_PRECEDING_USED;        // minus WORD_SIZE
+        //fprintf(stderr, "one done\n");
+        //copying a second to a third block
         // Put the new block in the free list using both insertFreeBlock() and coalesceFreeBlock()
         insertFreeBlock(secondBlock);           
         coalesceFreeBlock(secondBlock);       
 
         // Setting up the tag for the next block
-        returnBlock = (void *)UNSCALED_POINTER_ADD(ptrFreeBlock, WORD_SIZE);
-        returnBlock->sizeAndTags |= TAG_PRECEDING_USED;
+        //returnBlock = UNSCALED_POINTER_ADD(ptrFreeBlock, WORD_SIZE);
+        //returnBlock->sizeAndTags |= TAG_PRECEDING_USED;
   }
   else {
     // Now there is no need to split it
     // Update block header to be used and correct size
-        ptrFreeBlock->sizeAndTags = reqSize | TAG_USED;
-        ptrFreeBlock->sizeAndTags |= TAG_PRECEDING_USED;
-        if (returnBlock == NULL){return NULL;}
-  }
-    //fprintf(stderr, "second block's pervious value: %p\n", secondBlock->prev);
+        //ptrFreeBlock->sizeAndTags = reqSize | TAG_USED;
+        //ptrFreeBlock->sizeAndTags |= TAG_PRECEDING_USED;
+        fprintf(stderr, "enter else\n");
+    *((size_t*)UNSCALED_POINTER_ADD(ptrFreeBlock, reqSize - WORD_SIZE)) |= ~TAG_PRECEDING_USED;
+        fprintf(stderr, "three\n");        // minus WORD_SIZE
+    }
   // Return location of correct pointer!   
-    //fprintf(stderr, "ptr: %p\n", ptrFreeBlock);   
-    //fprintf(stderr, "return block finished\n");
     //examine_heap();
-    return returnBlock;
-}
-
-/* Free the block referenced by ptr. */
-void mm_free (void *ptr) {
-  size_t payloadSize;
-  BlockInfo * blockInfo;
-  BlockInfo * followingBlock;
-
-  // Implement mm_free.  You can change or remove the declaraions
-  // above.  They are included as minor hints.
-    //fprintf(stderr, "mm_free is called\n");
-  // Get block info and payload size
-    blockInfo = UNSCALED_POINTER_SUB(ptr, WORD_SIZE);
-    payloadSize = SIZE(blockInfo->sizeAndTags) - WORD_SIZE;
-
-  // Update block header and footer
-    blockInfo->sizeAndTags &= ~TAG_USED;
-    *(size_t*)UNSCALED_POINTER_ADD(blockInfo, payloadSize) = blockInfo->sizeAndTags;
-
-  // Get the next block and update its header (since its preceding block is now free)
-    followingBlock = UNSCALED_POINTER_ADD(ptr, payloadSize);
-    //fprintf(stderr, "follow block: %p\n", ptr);
-    followingBlock->sizeAndTags &= ~TAG_PRECEDING_USED;   
-    //fprintf(stderr, "next block header and its header\n");
-  // Insert free block into free list
-    insertFreeBlock(blockInfo);
-   
-  // Coalesce free block
-    coalesceFreeBlock(blockInfo);
-}
+    //precedingBlockUseTag = ptrFreeBlock->sizeAndTags & TAG_PRECEDING_USED;
+    //if (precedingBlockUseTag) ptrFreeBlock->sizeAndTags = blockSize | (TAG_PRECEDING_USED + TAG_USED);
+    //else{ptrFreeBlock->sizeAndTags = blockSize | TAG_USED;}
+    //fprintf(stderr, "the end\n");        // minus     examine_heap();
+    fprintf(stderr, "address of next %p\n", &ptrFreeBlock->next);        // minus WORD_SIZE
+    if (&ptrFreeBlock->next == NULL){return NULL;}else{return &ptrFreeBlock->next;}
